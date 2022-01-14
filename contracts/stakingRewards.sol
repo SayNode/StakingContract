@@ -8,15 +8,17 @@ contract StakingRewards {
 
     address private owner;
 
+
     uint public lastUpdateTime;
     uint public rewardPerTokenStored;
+    uint public contractBalance;
+    uint public _poolSize;
+    uint public rewardRate;
 
     mapping(address => uint) public userRewardPerTokenPaid;
     mapping(address => uint) public rewards;
 
-    uint private _contractBalance = address(this).balance;
-    uint private _poolSize;
-    uint private rewardRate;
+
 
     mapping(address => uint) private _balances;
 
@@ -30,24 +32,28 @@ contract StakingRewards {
       _;
     }
 
+    function ownerDeposit(uint _amount) public _ownerOnly{
+        stakingToken.transferFrom(msg.sender, address(this), _amount);
+        contractBalance += _amount;
+    }
+
+        function ownerWithdraw(uint _amount) public _ownerOnly{
+        stakingToken.transfer(msg.sender, _amount);
+        contractBalance -= _amount;
+    }
+
+
     function setRewardRate(uint rate) public _ownerOnly {
 
         rewardRate = rate;
     }
 
-    function checkRewardRate() public view returns (uint) {
-
-    return rewardRate;
-    }
-
-    function poolSize() public view returns (uint){
-
-    return _poolSize;
-    }
-
-
     function rewardPerToken() public view returns (uint) {
-        if (_contractBalance == 0) {
+        
+        if (contractBalance== 0) {
+            return 0;
+        }
+        if(_poolSize== 0) {
             return 0;
         }
         return
@@ -87,6 +93,7 @@ contract StakingRewards {
         uint reward = rewards[msg.sender];
         rewards[msg.sender] = 0;
         stakingToken.transfer(msg.sender, reward);
+        contractBalance -= reward;
     }
 }
 

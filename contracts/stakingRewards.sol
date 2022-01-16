@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.10;
 
+
+
 contract StakingRewards {
 
     ERC20 public stakingToken;
@@ -17,8 +19,7 @@ contract StakingRewards {
 
     mapping(address => uint) public userRewardPerTokenPaid;
     mapping(address => uint) public rewards;
-
-
+    mapping(address => uint) public _releaseTime;
 
     mapping(address => uint) private _balances;
 
@@ -30,6 +31,14 @@ contract StakingRewards {
     modifier _ownerOnly(){
       require(msg.sender == owner);
       _;
+    }
+
+    function releaseTime(address account) public view virtual returns (uint256) {
+        return _releaseTime[account];
+    }
+
+    function untilRelease(address account) public view virtual returns (uint256) {
+        return _releaseTime[account]-block.timestamp;
     }
 
     function ownerDeposit(uint _amount) public _ownerOnly{
@@ -78,18 +87,22 @@ contract StakingRewards {
     }
 
     function stake(uint _amount) external updateReward(msg.sender) {
+        _releaseTime[msg.sender] = block.timestamp+90*1 days; //lock funds for 90 days
         _poolSize += _amount;
         _balances[msg.sender] += _amount;
         stakingToken.transferFrom(msg.sender, address(this), _amount);
     }
 
     function withdraw(uint _amount) external updateReward(msg.sender) {
+        require(block.timestamp >= releaseTime(msg.sender), "TokenTimelock: current time is before release time");
+
         _poolSize-= _amount;
         _balances[msg.sender] -= _amount;
         stakingToken.transfer(msg.sender, _amount);
     }
 
     function getReward() external updateReward(msg.sender) {
+        require(block.timestamp >= releaseTime(msg.sender), "TokenTimelock: current time is before release time");
         uint reward = rewards[msg.sender];
         rewards[msg.sender] = 0;
         stakingToken.transfer(msg.sender, reward);

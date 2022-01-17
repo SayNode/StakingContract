@@ -5,23 +5,41 @@ pragma solidity ^0.8.10;
 
 
 contract StakingRewards {
-
     ERC20 public stakingToken;
 
-    address private owner;
-
-
-    uint public lastUpdateTime;
-    uint public rewardPerTokenStored;
-    uint public contractBalance;
+    uint public rewardPercentage;
     uint public _poolSize;
+<<<<<<< Updated upstream
     uint public rewardRate;
 
     mapping(address => uint) public userRewardPerTokenPaid;
     mapping(address => uint) public rewards;
     mapping(address => uint) public _releaseTime;
+=======
+    uint public _lockingPeriod;
+    uint public contractBalance;
+    uint public rewardPeriod;
+    
+    address private owner;
 
-    mapping(address => uint) private _balances;
+    struct Stake {
+        address user;
+        uint256 amount;
+        uint64 sinceBlock;
+        uint64 untilBlock;   
+        uint reward;
+         }
+
+    struct Reward{
+        uint reward;
+        uint64 start;
+        uint64 end;
+    }
+>>>>>>> Stashed changes
+
+    Stake[] public stakes;
+    Reward[] public rewards;
+   
 
     constructor(address _stakingToken) {
         stakingToken = ERC20(_stakingToken);
@@ -46,46 +64,66 @@ contract StakingRewards {
         contractBalance += _amount;
     }
 
-        function ownerWithdraw(uint _amount) public _ownerOnly{
+    function ownerWithdraw(uint _amount) public _ownerOnly{
         stakingToken.transfer(msg.sender, _amount);
         contractBalance -= _amount;
     }
 
-
-    function setRewardRate(uint rate) public _ownerOnly {
-
-        rewardRate = rate;
-    }
-
-    function rewardPerToken() public view returns (uint) {
+    function stake(uint _amount) external  {
+        _poolSize += _amount;
+        stakingToken.transferFrom(msg.sender, address(this), _amount);
+        stakes.push(Stake(msg.sender, _amount, uint64(block.timestamp), uint64(block.timestamp + _lockingPeriod ), 0));
         
-        if (contractBalance== 0) {
-            return 0;
+    }
+
+
+    function unstake (uint256 _id) external {
+        require(stakes[_id].user == msg.sender, 'Not your stake');
+        require(stakes[_id].amount > 0, 'Nothing to unstake');
+
+        uint _amount = stakes[_id].amount;
+        stakes[_id].untilBlock= uint64(block.timestamp);
+
+        calculateReward(_id); // Calculate Reward of the Stake
+
+        stakes[_id].amount= 0;
+        _poolSize-= _amount;
+        
+        stakingToken.transfer(msg.sender, _amount);
+        
+    }
+
+    function calculateReward(uint256 _id) public {
+        uint64 end;
+        
+        if(stakes[_id].untilBlock> uint64(block.timestamp)){
+            end =uint64(block.timestamp);
         }
-        if(_poolSize== 0) {
-            return 0;
+        else{
+            end = stakes[_id].untilBlock;
         }
-        return
-            rewardPerTokenStored +
-            (((block.timestamp - lastUpdateTime) * rewardRate * 1e18) / _poolSize);
-    }
 
-    function earned(address account) public view returns (uint) {
-        return
-            ((_balances[account] *
-                (rewardPerToken() - userRewardPerTokenPaid[account])) / 1e18) +
-            rewards[account];
-    }
+        for (uint i=0; i<=rewards.length; i++){
+            if(rewards[i].end > stakes[_id].sinceBlock ){
+                stakes[_id].reward = rewards[i].end - stakes[_id].sinceBlock * rewards[i].reward * stakes[_id].amount; // finds the  Start of the staking time
+            }
 
-    modifier updateReward(address account) {
-        rewardPerTokenStored = rewardPerToken();
-        lastUpdateTime = block.timestamp;
+            else if ((rewards[i].start > stakes[_id].sinceBlock) && (rewards[i].end > end) && (rewards[i].end != 0)  ){
+                stakes[_id].reward += end - stakes[_id].sinceBlock * rewards[i].reward * stakes[_id].amount; // finds Regions where the reward Rate change during staking
+            }
 
-        rewards[account] = earned(account);
-        userRewardPerTokenPaid[account] = rewardPerTokenStored;
-        _;
-    }
+            else if ((rewards[i].start < end&& rewards[i].start > stakes[_id].sinceBlock  )  && (rewards[i].end == 0)){
+                stakes[_id].reward += end - rewards[i].start * rewards[i].reward * stakes[_id].amount; // finds the end of the staking time
+            }
 
+            else if ((rewards[i].start < stakes[_id].sinceBlock)  && (rewards[i].end == 0)){
+                stakes[_id].reward += end - stakes[_id].sinceBlock * rewards[i].reward * stakes[_id].amount; // if the staking was in a period where no changes to the Rewardrate apperared, this will be executed
+            }
+
+        }
+
+
+<<<<<<< Updated upstream
     function stake(uint _amount) external updateReward(msg.sender) {
         _releaseTime[msg.sender] = block.timestamp+90*1 days; //lock funds for 90 days
         _poolSize += _amount;
@@ -107,7 +145,34 @@ contract StakingRewards {
         rewards[msg.sender] = 0;
         stakingToken.transfer(msg.sender, reward);
         contractBalance -= reward;
+=======
     }
+
+
+
+    function getReward(uint256 _id) external {
+
+        require(stakes[_id].user == msg.sender, 'Not your stake');
+        require(stakes[_id].amount == 0, 'Nothing to unstake');
+
+        stakingToken.transfer(msg.sender, stakes[_id].reward);
+ 
+    }
+
+
+    function setRewardRate(uint rate) public _ownerOnly {
+        
+        rewards.push(Reward(rate, uint64(block.timestamp), 0));
+        rewards[rewards.length -1].end = uint64(block.timestamp);
+        
+        
+    }  
+    
+    function setLockingPeriod(uint lockingPeriod) public _ownerOnly {
+        _lockingPeriod = lockingPeriod;
+>>>>>>> Stashed changes
+    }
+
 }
 
 interface ERC20 {

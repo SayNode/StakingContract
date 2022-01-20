@@ -1,6 +1,6 @@
 
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.10;
+pragma solidity ^0.8;
 
 
 
@@ -8,17 +8,17 @@ contract StakingRewards {
     ERC20 public stakingToken;
 
 
-    uint public _poolSize;
-    uint public _lockingPeriod;
-    uint public contractBalance;
+    uint public _poolSize; //all stakes together
+    uint public _lockingPeriod; // timeperiod in which each individual stake is locked in the contract
+    uint public contractBalance; // balance of the contract from which the rewards are payed
     
     address private owner;
 
     struct Stake {
         address user;
         uint amount;
-        uint sinceBlock;
-        uint untilBlock;   
+        uint sinceBlock; // start of staking
+        uint untilBlock; // end of staking
         uint reward;
          }
 
@@ -32,9 +32,10 @@ contract StakingRewards {
     Reward[] public rewards;
    
 
-    constructor(address _stakingToken) {
+    constructor(address _stakingToken, uint lockingPeriod) {
         stakingToken = ERC20(_stakingToken);
         owner = msg.sender;
+        _lockingPeriod = lockingPeriod; //* 1 days;
     }
 
     modifier _ownerOnly(){
@@ -42,48 +43,56 @@ contract StakingRewards {
       _;
     }
 
+    //function to deposit funds to the contract. Funds are used to pay the staking rewards
     function ownerDeposit(uint _amount) public _ownerOnly{
         stakingToken.transferFrom(msg.sender, address(this), _amount);
         contractBalance += _amount;
     }
 
+    //function to withdraw from the Contract
     function ownerWithdraw(uint _amount) public _ownerOnly{
         stakingToken.transfer(msg.sender, _amount);
         contractBalance -= _amount;
     }
 
-    function stake(uint _amount) external  {
+    //function to create an individual stake
+    function stake(uint _amount) public returns(uint) {
+        require(_amount > 0, 'Nothing to stake'); //check that you stake something
         _poolSize += _amount;
         stakingToken.transferFrom(msg.sender, address(this), _amount);
         stakes.push(Stake(msg.sender, _amount, uint(block.timestamp), uint(block.timestamp + _lockingPeriod ), 0));
-        
+        return stakes.length;
     }
 
-
-    function unstake (uint _id) external {
-        require(stakes[_id].user == msg.sender, 'Not your stake');
-        require(stakes[_id].amount > 0, 'Nothing to unstake');
-        require(stakes[_id].untilBlock < uint(block.timestamp), 'To early');
-
-        uint _amount = stakes[_id].amount;
-        stakes[_id].untilBlock= uint(block.timestamp);
-
+    //function to withdraw your funds
+    function unstake (uint _id) public  {
+        require(stakes[_id].user == msg.sender, 'Not your stake'); //check if its your stake
+        require(stakes[_id].amount > 0, 'Nothing to unstake'); //check if something is staked
+        require(stakes[_id].untilBlock < uint(block.timestamp), 'Too early'); //check if locking period is over
+        
         calculateReward(_id); // Calculate Reward of the Stake
+        uint _amount;
+        if(contractBalance < stakes[_id].reward){ // if there is not enough balance to pay the reward, just pay the stake back. Prevent locked funds.
+            _amount = stakes[_id].amount;
+        }
+        else{
+            _amount = stakes[_id].amount + stakes[_id].reward; //add reward to the payout amount
+            stakes[_id].reward =0; // empty the reward
 
+        }
+        _poolSize-= stakes[_id].amount; 
         stakes[_id].amount= 0;
-        _poolSize-= _amount;
+        stakingToken.transfer(msg.sender, _amount); //transfer the payout
         
-        stakingToken.transfer(msg.sender, _amount);
-        getReward(_id);
         
     }
 
+    //function to calculate the reward of each individual stake
     function calculateReward(uint _id) public {
-        stakes[_id].reward =0;
+        stakes[_id].reward =0; //set reward to 0 to prevent adding it everytime
         uint end;
 
-        
-        if(stakes[_id].untilBlock> uint(block.timestamp)){
+        if(stakes[_id].untilBlock> uint(block.timestamp)){ //check if locking period is over now. If not, take the actual time to calculate it
             end = uint(block.timestamp);
         }
         else{
@@ -113,30 +122,16 @@ contract StakingRewards {
 
     }
 
-    function getReward(uint _id) public {
-
-        require(stakes[_id].user == msg.sender, 'Not your reward');
-        require(stakes[_id].reward > 0, 'Nothing to unstake');
-        require(stakes[_id].reward < contractBalance , 'Not enought balance in contract');
-
-        stakes[_id].reward = 0;
-        stakingToken.transfer(msg.sender, stakes[_id].reward);
- 
-    }
-
-    function setRewardRate(uint rate) public _ownerOnly {
-        
+    //function to set reward rate for current timeperiod
+    function setRewardRate(uint rate) public _ownerOnly {    
         rewards.push(Reward(rate, uint(block.timestamp), uint(0)));
         if(rewards.length>1){
             rewards[rewards.length -2].end = uint(block.timestamp);
         }
         
     }  
-    
-    function setLockingPeriod(uint lockingPeriod) public _ownerOnly {
-        _lockingPeriod = lockingPeriod;
-    }
 
+    //function to check how long your funds are stil locked
     function untilLockingEnd(uint _id) public view returns(uint) {
         return stakes[_id].untilBlock - uint(block.timestamp);
     }

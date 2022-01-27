@@ -113,7 +113,7 @@ contract StakingRewards {
                 stakes[_id].reward += (rewards[i].end - rewards[i].start) * rewards[i].reward * stakes[_id].amount; //reward rate during staking
             }
 
-            else if ((rewards[i].start < end) && (rewards[i].start > stakes[_id].sinceBlock)  && (rewards[i].end == 0)){
+            else if ((rewards[i].start < end) && (rewards[i].start > stakes[_id].sinceBlock)){
                 stakes[_id].reward += (end - rewards[i].start) * rewards[i].reward * stakes[_id].amount; //last reward rate
             }
 

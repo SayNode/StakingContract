@@ -9,7 +9,7 @@ contract StakingRewards {
 
 
     uint public _poolSize; //all stakes together
-    uint public _lockingPeriod; // timeperiod in which each individual stake is locked in the contract
+    uint public _lockingPeriod; // time period in which each individual stake is locked in the contract
     uint public contractBalance; // balance of the contract from which the rewards are payed
     
     address private owner;
@@ -23,9 +23,9 @@ contract StakingRewards {
          }
 
     struct Reward{
-        uint reward;
-        uint start;
-        uint end;
+        uint reward; // reward in promille
+        uint start; // start of reward period
+        uint end; // end of reward period
     }
 
     Stake[] public stakes;
@@ -35,7 +35,8 @@ contract StakingRewards {
     constructor(address _stakingToken, uint lockingPeriod) {
         stakingToken = ERC20(_stakingToken);
         owner = msg.sender;
-        _lockingPeriod = lockingPeriod; //* 1 days;
+        _lockingPeriod = lockingPeriod * 1 days;
+        rewards.push(Reward(uint(100), uint(block.timestamp), uint(0))); //set first reward rate as 100
     }
 
     modifier _ownerOnly(){
@@ -91,6 +92,8 @@ contract StakingRewards {
     function calculateReward(uint _id) public {
         stakes[_id].reward =0; //set reward to 0 to prevent adding it everytime
         uint end;
+        uint divisor = 31536000000; // 24*60*60(Days) * 365(year) * 1000 (promille)
+        
 
         if(stakes[_id].untilBlock> uint(block.timestamp)){ //check if locking period is over now. If not, take the actual time to calculate it
             end = uint(block.timestamp);
@@ -102,19 +105,19 @@ contract StakingRewards {
          for (uint i=0; i<rewards.length; i++){
              
             if ((rewards[i].start < stakes[_id].sinceBlock)  && (rewards[i].end == 0)){
-                stakes[_id].reward += (end - stakes[_id].sinceBlock) * rewards[i].reward * stakes[_id].amount; // if staking starts and ends without reward change
+                stakes[_id].reward +=((end - stakes[_id].sinceBlock) * rewards[i].reward * stakes[_id].amount)/divisor; // if staking starts and ends without reward change
             }
 
             else if((rewards[i].start < stakes[_id].sinceBlock) && (rewards[i].end > stakes[_id].sinceBlock) && (rewards[i].end != 0)){
-                stakes[_id].reward += (rewards[i].end - stakes[_id].sinceBlock) * rewards[i].reward * stakes[_id].amount; //first feward rate
+                stakes[_id].reward += ((rewards[i].end - stakes[_id].sinceBlock) * rewards[i].reward * stakes[_id].amount)/divisor; //first reward rate of the stake
             }
 
             else if ((rewards[i].start > stakes[_id].sinceBlock) && (rewards[i].end < end) && (rewards[i].end != 0)  ){
-                stakes[_id].reward += (rewards[i].end - rewards[i].start) * rewards[i].reward * stakes[_id].amount; //reward rate during staking
+                stakes[_id].reward += ((rewards[i].end - rewards[i].start) * rewards[i].reward * stakes[_id].amount)/divisor; //reward rate during staking
             }
 
             else if ((rewards[i].start < end) && (rewards[i].start > stakes[_id].sinceBlock)){
-                stakes[_id].reward += (end - rewards[i].start) * rewards[i].reward * stakes[_id].amount; //last reward rate
+                stakes[_id].reward += ((end - rewards[i].start) * rewards[i].reward * stakes[_id].amount)/divisor; //last reward rate of the stake
             }
 
         }
@@ -124,9 +127,9 @@ contract StakingRewards {
 
     //function to set reward rate for current timeperiod
     function setRewardRate(uint rate) public _ownerOnly {    
-        rewards.push(Reward(rate, uint(block.timestamp), uint(0)));
+        rewards.push(Reward(rate, uint(block.timestamp), uint(0))); // last reward rate has 0 as end as identifier. 
         if(rewards.length>1){
-            rewards[rewards.length -2].end = uint(block.timestamp);
+            rewards[rewards.length -2].end = uint(block.timestamp); //set end of the previous reward rate to actual time
         }
         
     }  

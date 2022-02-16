@@ -78,7 +78,9 @@ contract StakingRewards {
         }
         else{
             _amount = stakes[_id].amount + stakes[_id].reward; //add reward to the payout amount
+            contractBalance -= stakes[_id].reward; // reduce the contractBalance by the amount of the Reward
             stakes[_id].reward =0; // empty the reward
+            
 
         }
         _poolSize-= stakes[_id].amount; 
@@ -86,6 +88,15 @@ contract StakingRewards {
         stakingToken.transfer(msg.sender, _amount); //transfer the payout
         
         
+    }
+
+    function claimReward(uint _id) public {
+         require(stakes[_id].user == msg.sender, 'Not your reward');
+         require(stakes[_id].untilBlock < uint(block.timestamp), 'Too early');
+         require(stakes[_id].reward < contractBalance, 'Not enough funds to payout' );
+         stakingToken.transfer(msg.sender, stakes[_id].reward); //transfer the payout
+         stakes[_id].reward = 0; //empty rewards.
+      
     }
 
     //function to calculate the reward of each individual stake
@@ -116,7 +127,7 @@ contract StakingRewards {
                 stakes[_id].reward += ((rewards[i].end - rewards[i].start) * rewards[i].reward * stakes[_id].amount)/divisor; //reward rate during staking
             }
 
-            else if ((rewards[i].start < end) && (rewards[i].start > stakes[_id].sinceBlock)){
+            else if ((rewards[i].end < end) && (rewards[i].start > stakes[_id].sinceBlock)){
                 stakes[_id].reward += ((end - rewards[i].start) * rewards[i].reward * stakes[_id].amount)/divisor; //last reward rate of the stake
             }
 
@@ -136,7 +147,13 @@ contract StakingRewards {
 
     //function to check how long your funds are stil locked
     function untilLockingEnd(uint _id) public view returns(uint) {
-        return stakes[_id].untilBlock - uint(block.timestamp);
+        if(stakes[_id].untilBlock < block.timestamp){
+            return 0;
+        }
+        else{
+            return stakes[_id].untilBlock - uint(block.timestamp);
+
+        }
     }
 
 }

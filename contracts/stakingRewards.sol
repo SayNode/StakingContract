@@ -107,10 +107,6 @@ contract StakingRewards {
       
     }
 
-    function _calclateReward(uint _id) public {
-        calculateReward(_id);
-    }
-
     //function to calculate the reward of each individual stake
     function calculateReward(uint _id) internal {
         stakes[_id].reward =0; //set reward to 0 to prevent adding it everytime

@@ -45,19 +45,19 @@ contract StakingRewards {
     }
 
     //function to deposit funds to the contract. Funds are used to pay the staking rewards
-    function ownerDeposit(uint _amount) public _ownerOnly{
+    function ownerDeposit(uint _amount) external _ownerOnly{
         stakingToken.transferFrom(msg.sender, address(this), _amount);
         contractBalance += _amount;
     }
 
     //function to withdraw from the Contract
-    function ownerWithdraw(uint _amount) public _ownerOnly{
+    function ownerWithdraw(uint _amount) external _ownerOnly{
         stakingToken.transfer(msg.sender, _amount);
         contractBalance -= _amount;
     }
 
     //function to create an individual stake
-    function stake(uint _amount) public returns(uint) {
+    function stake(uint _amount) external returns(uint) {
         require(_amount > 0, 'Nothing to stake'); //check that you stake something
         _poolSize += _amount;
         stakingToken.transferFrom(msg.sender, address(this), _amount);
@@ -66,23 +66,24 @@ contract StakingRewards {
     }
 
     //function to withdraw your funds
-    function unstake (uint _id) public  {
+    function unstake (uint _id) external  {
         require(stakes[_id].user == msg.sender, 'Not your stake'); //check if its your stake
-        require(stakes[_id].amount > 0, 'Nothing to unstake'); //check if something is staked
         require(stakes[_id].untilBlock < uint(block.timestamp), 'Too early'); //check if locking period is over
         
         calculateReward(_id); // Calculate Reward of the Stake
         uint _amount;
+
         if(contractBalance < stakes[_id].reward){ // if there is not enough balance to pay the reward, just pay the stake back. Prevent locked funds.
             _amount = stakes[_id].amount;
         }
+
         else{
             _amount = stakes[_id].amount + stakes[_id].reward; //add reward to the payout amount
             contractBalance -= stakes[_id].reward; // reduce the contractBalance by the amount of the Reward
             stakes[_id].reward =0; // empty the reward
-            
 
         }
+
         _poolSize-= stakes[_id].amount; 
         stakes[_id].amount= 0;
         stakingToken.transfer(msg.sender, _amount); //transfer the payout
@@ -90,17 +91,28 @@ contract StakingRewards {
         
     }
 
-    function claimReward(uint _id) public {
+    function claimReward(uint _id) external {
          require(stakes[_id].user == msg.sender, 'Not your reward');
          require(stakes[_id].untilBlock < uint(block.timestamp), 'Too early');
-         require(stakes[_id].reward < contractBalance, 'Not enough funds to payout' );
-         stakingToken.transfer(msg.sender, stakes[_id].reward); //transfer the payout
+         require(stakes[_id].reward <= contractBalance, 'Not enough funds to payout' );
+         require(stakes[_id].reward > 0, 'Nothing to payout' );
+         require(stakes[_id].amount == 0, 'Use unstake' );
+
+         
+         uint _amount= stakes[_id].reward;
          stakes[_id].reward = 0; //empty rewards.
+         stakingToken.transfer(msg.sender, _amount ); //transfer the payout
+         contractBalance -= _amount; // reduce the contract balance 
+         
       
     }
 
+    function _calclateReward(uint _id) public {
+        calculateReward(_id);
+    }
+
     //function to calculate the reward of each individual stake
-    function calculateReward(uint _id) public {
+    function calculateReward(uint _id) internal {
         stakes[_id].reward =0; //set reward to 0 to prevent adding it everytime
         uint end;
         uint divisor = 31536000000; // 24*60*60(Days) * 365(year) * 1000 (promille)

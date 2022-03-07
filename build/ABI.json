@@ -418,7 +418,7 @@
         "type": "uint256"
       }
     ],
-    "name": "calculateReward",
+    "name": "claimReward",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

@@ -35,7 +35,7 @@ contract StakingRewards {
     constructor(address _stakingToken, uint lockingPeriod) {
         stakingToken = ERC20(_stakingToken);
         owner = msg.sender;
-        _lockingPeriod = lockingPeriod * 1 days;
+        _lockingPeriod = lockingPeriod;
         rewards.push(Reward(uint(100), uint(block.timestamp), uint(0))); //set first reward rate as 100
     }
 
@@ -59,16 +59,22 @@ contract StakingRewards {
     //function to create an individual stake
     function stake(uint _amount) external returns(uint) {
         require(_amount > 0, 'Nothing to stake'); //check that you stake something
+
+        bool isTransfered = stakingToken.transferFrom(msg.sender, address(this), _amount);
+
+        require(isTransfered == true, "Error while transfer"); // breaks if an error occoured during transfer
+
         _poolSize += _amount;
-        stakingToken.transferFrom(msg.sender, address(this), _amount);
         stakes.push(Stake(msg.sender, _amount, uint(block.timestamp), uint(block.timestamp + _lockingPeriod ), 0));
         return stakes.length;
+                
     }
 
     //function to withdraw your funds
     function unstake (uint _id) external  {
         require(stakes[_id].user == msg.sender, 'Not your stake'); //check if its your stake
         require(stakes[_id].untilBlock < uint(block.timestamp), 'Too early'); //check if locking period is over
+        require(stakes[_id].amount > 0, 'Nothing to unstake');
         
         calculateReward(_id); // Calculate Reward of the Stake
         uint _amount;
@@ -109,33 +115,36 @@ contract StakingRewards {
 
     //function to calculate the reward of each individual stake
     function calculateReward(uint _id) internal {
-        stakes[_id].reward =0; //set reward to 0 to prevent adding it everytime
+        stakes[_id].reward = 0; //set reward to 0 to prevent adding it everytime
         uint end;
         uint divisor = 31536000000; // 24*60*60(Days) * 365(year) * 1000 (promille)
-        
 
-        if(stakes[_id].untilBlock> uint(block.timestamp)){ //check if locking period is over now. If not, take the actual time to calculate it
-            end = uint(block.timestamp);
-        }
-        else{
-            end = stakes[_id].untilBlock;
-        }
+        end = stakes[_id].untilBlock;
         
          for (uint i=0; i<rewards.length; i++){
              
-            if ((rewards[i].start < stakes[_id].sinceBlock)  && (rewards[i].end == 0)){
+            if ((rewards[i].start <= stakes[_id].sinceBlock)  && (rewards[i].end == 0)){
                 stakes[_id].reward +=((end - stakes[_id].sinceBlock) * rewards[i].reward * stakes[_id].amount)/divisor; // if staking starts and ends without reward change
             }
 
-            else if((rewards[i].start < stakes[_id].sinceBlock) && (rewards[i].end > stakes[_id].sinceBlock) && (rewards[i].end != 0)){
-                stakes[_id].reward += ((rewards[i].end - stakes[_id].sinceBlock) * rewards[i].reward * stakes[_id].amount)/divisor; //first reward rate of the stake
+            else if((rewards[i].start <= stakes[_id].sinceBlock) && (rewards[i].end >= stakes[_id].sinceBlock) && (rewards[i].end != 0)){
+                uint endOfBlock;
+                
+                if(rewards[i].end >= stakes[_id].untilBlock){
+                    endOfBlock = stakes[_id].untilBlock;
+                }
+                else{
+                    endOfBlock = rewards[i].end;
+                }
+
+                stakes[_id].reward += ((endOfBlock - stakes[_id].sinceBlock) * rewards[i].reward * stakes[_id].amount)/divisor; //first reward rate of the stake
             }
 
-            else if ((rewards[i].start > stakes[_id].sinceBlock) && (rewards[i].end < end) && (rewards[i].end != 0)  ){
+            else if ((rewards[i].start >= stakes[_id].sinceBlock) && (rewards[i].end <= end) && (rewards[i].end != 0)  ){
                 stakes[_id].reward += ((rewards[i].end - rewards[i].start) * rewards[i].reward * stakes[_id].amount)/divisor; //reward rate during staking
             }
 
-            else if ((rewards[i].end < end) && (rewards[i].start > stakes[_id].sinceBlock)){
+            else if ((rewards[i].start <= end) && (rewards[i].start >= stakes[_id].sinceBlock)){
                 stakes[_id].reward += ((end - rewards[i].start) * rewards[i].reward * stakes[_id].amount)/divisor; //last reward rate of the stake
             }
 

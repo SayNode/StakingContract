@@ -9,7 +9,6 @@ contract StakingRewards {
 
 
     uint public _poolSize; //all stakes together
-    uint public _lockingPeriod; // time period in which each individual stake is locked in the contract
     uint public contractBalance; // balance of the contract from which the rewards are payed
     
     address private owner;
@@ -32,10 +31,9 @@ contract StakingRewards {
     Reward[] public rewards;
    
 
-    constructor(address _stakingToken, uint lockingPeriod) {
+    constructor(address _stakingToken) {
         stakingToken = ERC20(_stakingToken);
         owner = msg.sender;
-        _lockingPeriod = lockingPeriod;
         rewards.push(Reward(uint(100), uint(block.timestamp), uint(0))); //set first reward rate as 100
     }
 
@@ -65,7 +63,7 @@ contract StakingRewards {
         require(isTransfered == true, "Error while transfer"); // breaks if an error occoured during transfer
 
         _poolSize += _amount;
-        stakes.push(Stake(msg.sender, _amount, uint(block.timestamp), uint(block.timestamp + _lockingPeriod ), 0));
+        stakes.push(Stake(msg.sender, _amount, uint(block.timestamp), uint(block.timestamp), 0));
         return stakes.length;
                 
     }
@@ -73,8 +71,9 @@ contract StakingRewards {
     //function to withdraw your funds
     function unstake (uint _id) external  {
         require(stakes[_id].user == msg.sender, 'Not your stake'); //check if its your stake
-        require(stakes[_id].untilBlock < uint(block.timestamp), 'Too early'); //check if locking period is over
         require(stakes[_id].amount > 0, 'Nothing to unstake');
+
+        stakes[_id].untilBlock = uint(block.timestamp); // sets the end of the stake to calculate the correct reward.
         
         calculateReward(_id); // Calculate Reward of the Stake
         uint _amount;
@@ -99,7 +98,6 @@ contract StakingRewards {
 
     function claimReward(uint _id) external {
          require(stakes[_id].user == msg.sender, 'Not your reward');
-         require(stakes[_id].untilBlock < uint(block.timestamp), 'Too early');
          require(stakes[_id].reward <= contractBalance, 'Not enough funds to payout' );
          require(stakes[_id].reward > 0, 'Nothing to payout' );
          require(stakes[_id].amount == 0, 'Use unstake' );
@@ -162,16 +160,6 @@ contract StakingRewards {
         
     }  
 
-    //function to check how long your funds are stil locked
-    function untilLockingEnd(uint _id) public view returns(uint) {
-        if(stakes[_id].untilBlock < block.timestamp){
-            return 0;
-        }
-        else{
-            return stakes[_id].untilBlock - uint(block.timestamp);
-
-        }
-    }
 
 }
 

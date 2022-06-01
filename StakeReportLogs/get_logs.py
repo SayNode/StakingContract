@@ -68,7 +68,7 @@ def write_JSON(connector,_contract, DHN_STAKE_contract_addresses):
 
             #otherwise add to array of Stake struct objects 
             stakes.append(result)
-            
+
     return stakes
 
 
@@ -77,10 +77,9 @@ def main():
     (connector,_contract, DHN_STAKE_contract_addresses)=init()
 
     #Files to write to
-    json_files = ['./StakeReportLogs/json_files/90d.json', './StakeReportLogs/json_files/183d.json', 
-                  './StakeReportLogs/json_files/365d.json', './StakeReportLogs/json_files/3j.json']
+    json_files = ['./json_files/90d.json', './json_files/183d.json', './json_files/365d.json', './json_files/3j.json']
     print("------------------Writting JSON files------------------\n")
-    
+
     # For each json file expecified
     for i in range(0,len(json_files)-1):
 
@@ -104,10 +103,7 @@ def main():
         # use json.dump to write the file
         with open(json_files[i], 'w') as file:
             json.dump(my_dict, file, indent=4)
-    
+
     print("--------------------Writing finished-------------------")
 
 main()
-
-
-

@@ -77,7 +77,8 @@ def main():
     (connector,_contract, DHN_STAKE_contract_addresses)=init()
 
     #Files to write to
-    json_files = ['./json_files/90d.json', './json_files/183d.json', './json_files/365d.json', './json_files/3j.json']
+    json_files = ['./StakeReportLogs/json_files/90d.json', './StakeReportLogs/json_files/183d.json', 
+                  './StakeReportLogs/json_files/365d.json', './StakeReportLogs/json_files/3j.json']
     print("------------------Writting JSON files------------------\n")
     
     # For each json file expecified
